@@ -122,11 +122,15 @@ jobs:
                   # Re-compress to control.tar.gz
                   tar -czf control.tar.gz -C control_dir .
       
+                  # Re-create the directory structure for the new .deb file
+                  new_file_path="../new_$file"
+                  mkdir -p "$(dirname "$new_file_path")"
+      
                   # Re-package .deb without .zst, using control.tar.gz
-                  ar rcs ../new_$file debian-binary control.tar.gz data.tar.xz
+                  ar rcs "$new_file_path" debian-binary control.tar.gz data.tar.xz
       
                   # Replace the original file with the new one
-                  mv ../new_$file ../$file
+                  mv "$new_file_path" ../$file
                 else
                   echo "Warning: control.tar in $file does not contain expected control files. Skipping."
                 fi
@@ -139,6 +143,7 @@ jobs:
             cd ..
             rm -rf temp_dir
           done
+
 
       # Run the script to add the packages to the repositories and check sign
       - name: Add Packages to Repositories
