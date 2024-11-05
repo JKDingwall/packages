@@ -101,29 +101,45 @@ jobs:
             # Extract .deb package
             ar x ../$file
       
-            # Check if control.tar.zst exists
+            # Check if control.tar.zst exists and decompress
             if [ -f control.tar.zst ]; then
               echo "$file has a Zstandard compressed control file. Converting..."
-              
+      
               # Decompress control.tar.zst to control.tar
               unzstd control.tar.zst
       
-              # Re-compress to control.tar.gz
-              tar -czf control.tar.gz -C . control/
+              # Verify if control.tar exists after decompression
+              if [ -f control.tar ]; then
+                # Check the contents of control.tar before extracting
+                tar -tf control.tar
+                
+                # Extract files from control.tar only if it contains expected files
+                if tar -tf control.tar | grep -qE 'control|postinst|preinst|postrm|prerm'; then
+                  # Create directory to extract the contents of control.tar
+                  mkdir -p control_dir
+                  tar -xf control.tar -C control_dir
       
-              # Re-package .deb without .zst
-              ar rcs ../new_$file debian-binary control.tar.gz data.tar.xz
+                  # Re-compress to control.tar.gz
+                  tar -czf control.tar.gz -C control_dir .
       
-              # Replace the original file with the new one
-              mv ../new_$file ../$file
+                  # Re-package .deb without .zst, using control.tar.gz
+                  ar rcs ../new_$file debian-binary control.tar.gz data.tar.xz
+      
+                  # Replace the original file with the new one
+                  mv ../new_$file ../$file
+                else
+                  echo "Warning: control.tar in $file does not contain expected control files. Skipping."
+                fi
+              else
+                echo "Error: Failed to decompress control.tar.zst in $file"
+              fi
             fi
-            
-            # Clean up temp directory
+      
+            # Clean up temporary directory
             cd ..
             rm -rf temp_dir
           done
 
-          
       # Run the script to add the packages to the repositories and check sign
       - name: Add Packages to Repositories
         run: |
