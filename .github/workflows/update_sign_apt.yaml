@@ -90,6 +90,40 @@ jobs:
           mkdir Packages
           aws s3 sync s3://$AWS_SOURCE_BUCKET Packages --exclude "*" --include "*.deb"
           
+      # After "Download deb files" step
+      - name: Handle Zstandard Compression
+        run: |
+          for file in $(find Packages -name '*.deb'); do
+            echo "Processing $file"
+            mkdir -p temp_dir
+            cd temp_dir
+      
+            # Extract .deb package
+            ar x ../$file
+      
+            # Check if control.tar.zst exists
+            if [ -f control.tar.zst ]; then
+              echo "$file has a Zstandard compressed control file. Converting..."
+              
+              # Decompress control.tar.zst to control.tar
+              unzstd control.tar.zst
+      
+              # Re-compress to control.tar.gz
+              tar -czf control.tar.gz -C . control/
+      
+              # Re-package .deb without .zst
+              ar rcs ../new_$file debian-binary control.tar.gz data.tar.xz
+      
+              # Replace the original file with the new one
+              mv ../new_$file ../$file
+            fi
+            
+            # Clean up temp directory
+            cd ..
+            rm -rf temp_dir
+          done
+
+          
       # Run the script to add the packages to the repositories and check sign
       - name: Add Packages to Repositories
         run: |
